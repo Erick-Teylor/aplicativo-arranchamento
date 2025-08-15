@@ -76,7 +76,7 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#fff' },
-  logo: { width: 150, height: 150, alignSelf: 'center', marginBottom: 20, marginTop: -50 },
+  logo: { width: 250, height: 250, alignSelf: 'center', marginBottom: 5, marginTop: -40 },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
   input: { borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 5, marginBottom: 10 },
   button: { backgroundColor: colors.button, padding: 12, borderRadius: 5 },

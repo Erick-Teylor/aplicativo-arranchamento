@@ -1,25 +1,73 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Alert, TouchableOpacity, Modal, FlatList, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
 import { colors } from '../theme';
-
-// Firebase modular SDK
 import { auth, firestore } from '../services/FirebaseConfig';
 import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
+type DropdownProps = {
+  label: string;
+  options: string[];
+  selected: string | null;
+  onSelect: (value: string) => void;
+};
+
+function DropdownInput({ label, options, selected, onSelect }: DropdownProps) {
+  const [visible, setVisible] = useState(false);
+
+  const handleSelect = (value: string) => {
+    onSelect(value);
+    setVisible(false);
+  };
+
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <TouchableOpacity
+        style={styles.input}
+        onPress={() => setVisible(true)}
+      >
+        <Text style={{ color: selected ? '#000' : '#3d3d3dff' }}>
+          {selected ?? label}
+        </Text>
+      </TouchableOpacity>
+
+      <Modal transparent visible={visible} animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setVisible(false)}>
+          <View style={styles.modalContent}>
+            <FlatList
+              data={options}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.option}
+                  onPress={() => handleSelect(item)}
+                >
+                  <Text>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+}
+
 export default function RegisterScreen({ navigation }: Props) {
   const [id, setId] = useState('');
-  const [nome, setNome] = useState('');
+  const [numeroGuerra, setNumeroGuerra] = useState('');
+  const [nomeGuerra, setNomeGuerra] = useState('');
+  const [cia, setCia] = useState<string | null>(null);
   const [senha, setSenha] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function criarConta() {
-    if (!id || !nome || !senha) {
+    if (!id || !numeroGuerra || !nomeGuerra || !cia || !senha || !confirm) {
       return Alert.alert('Atenção', 'Preencha todos os campos');
     }
     if (senha !== confirm) {
@@ -27,40 +75,31 @@ export default function RegisterScreen({ navigation }: Props) {
     }
 
     setLoading(true);
-
     let userCredential = null;
 
     try {
-      // 1️⃣ Criar usuário no Auth
       const emailFicticio = `${id.trim()}@exemplo.com`;
       userCredential = await createUserWithEmailAndPassword(auth, emailFicticio, senha);
-      console.log('✅ Usuário criado no Auth:', userCredential.user.uid);
 
-      // 2️⃣ Criar referência de documento correta no Firestore
       const userDocRef = doc(firestore, 'usuarios', userCredential.user.uid);
-
-      // 3️⃣ Salvar dados no Firestore
       await setDoc(userDocRef, {
         id_militar: id,
-        nome: nome,
+        numero_guerra: numeroGuerra,
+        nome_guerra: nomeGuerra,
+        cia: cia,
       });
-      console.log('✅ Registro salvo no Firestore');
 
       Alert.alert('Sucesso', 'Conta criada! Faça login.');
       navigation.replace('Login');
     } catch (err: any) {
       console.error('❌ Erro ao criar conta:', err);
-
-      // Se usuário foi criado no Auth mas falhou no Firestore, remove o Auth
       if (userCredential?.user) {
         try {
           await deleteUser(userCredential.user);
-          console.log('♻️ Usuário Auth removido devido a erro no Firestore');
         } catch (deleteErr) {
           console.error('❌ Falha ao deletar usuário Auth:', deleteErr);
         }
       }
-
       Alert.alert('Erro', err.message || 'Falha ao criar conta.');
     } finally {
       setLoading(false);
@@ -76,36 +115,61 @@ export default function RegisterScreen({ navigation }: Props) {
         <TextInput
           style={styles.input}
           placeholder="ID Militar"
+          placeholderTextColor="#3d3d3dff"
           value={id}
           onChangeText={setId}
           keyboardType="numeric"
         />
+
         <TextInput
           style={styles.input}
-          placeholder="Nome Completo"
-          value={nome}
-          onChangeText={setNome}
+          placeholder="Número de Guerra"
+          placeholderTextColor="#3d3d3dff"
+          value={numeroGuerra}
+          onChangeText={setNumeroGuerra}
         />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Nome de Guerra"
+          placeholderTextColor="#3d3d3dff"
+          value={nomeGuerra}
+          onChangeText={setNomeGuerra}
+        />
+
+        <DropdownInput
+          label="Companhia"
+          options={['2° Cia', 'CCAP', '3° Cia', 'CEP']}
+          selected={cia}
+          onSelect={setCia}
+        />
+
         <TextInput
           style={styles.input}
           placeholder="Nova Senha"
+          placeholderTextColor="#3d3d3dff"
           secureTextEntry
           value={senha}
           onChangeText={setSenha}
         />
+
         <TextInput
           style={styles.input}
           placeholder="Confirmar Senha"
+          placeholderTextColor="#3d3d3dff"
           secureTextEntry
           value={confirm}
           onChangeText={setConfirm}
         />
 
-        <Button
-          title={loading ? 'Criando...' : 'Criar Conta'}
+        {/* Botão Criar Conta com mesma cor do LoginScreen */}
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: colors.button }]}
           onPress={criarConta}
           disabled={loading}
-        />
+        >
+          <Text style={styles.buttonText}>{loading ? 'Criando...' : 'Criar Conta'}</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -121,8 +185,26 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: '#F7F7F9',
     marginBottom: 10,
+  },
+  button: { padding: 12, borderRadius: 5, marginTop: 10 },
+  buttonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 10,
+  },
+  option: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
   },
 });
