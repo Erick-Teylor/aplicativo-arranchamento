@@ -1,15 +1,18 @@
+// navigation/index.tsx
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import SelectDayScreen from '../screens/SelectDayScreen';
 import MenuScreen from '../screens/MenuScreen';
+import AdminScreen from '../screens/AdminScreen';
 
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   SelectDay: undefined;
   Menu: { dateISO: string; label?: string };
+  Admin: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -36,6 +39,11 @@ export default function RootNavigator() {
         name="Menu"
         component={MenuScreen}
         options={{ title: 'Cardápio do Dia' }}
+      />
+      <Stack.Screen
+        name="Admin"
+        component={AdminScreen}
+        options={{ title: 'Área do Administrador' }}
       />
     </Stack.Navigator>
   );

@@ -27,21 +27,39 @@ export default function MenuScreen({ route, navigation }: Props) {
   // Carrega usuário e arranchamento do dia
   useEffect(() => {
     (async () => {
-      const raw = await AsyncStorage.getItem('user');
-      if (raw) {
+      try {
+        const raw = await AsyncStorage.getItem('user');
+        if (!raw) {
+          Alert.alert('Sessão expirada', 'Faça login novamente.');
+          return navigation.navigate('Login');
+        }
+
         const userData = JSON.parse(raw);
         setUser(userData);
 
-        const { data, error } = await fetchArranchamento(userData.id, dateISO);
+        // Pega o ID correto: id ou uid
+        const userId = userData.id ?? userData.uid;
+        if (!userId) {
+          Alert.alert('Erro', 'ID de usuário inválido.');
+          return navigation.navigate('Login');
+        }
+
+        const { data, error } = await fetchArranchamento(userId, dateISO);
         if (error) {
           console.error('Erro ao buscar arranchamento:', error);
         } else if (data && data.length > 0) {
-          setCafe(data[0].cafe);
-          setAlmoco(data[0].almoco);
-          setJanta(data[0].janta);
+          setCafe(!!data[0].cafe);
+          setAlmoco(!!data[0].almoco);
+          setJanta(!!data[0].janta);
+        } else {
+          // Nenhum arranchamento encontrado, reseta estados
+          setCafe(false);
+          setAlmoco(false);
+          setJanta(false);
         }
-      } else {
-        Alert.alert('Sessão expirada', 'Faça login novamente.');
+      } catch (e) {
+        console.error('Falha ao carregar usuário:', e);
+        Alert.alert('Erro', 'Não foi possível carregar seus dados.');
         navigation.navigate('Login');
       }
     })();
@@ -49,13 +67,14 @@ export default function MenuScreen({ route, navigation }: Props) {
 
   // Confirma seleção e envia para o Firebase
   async function confirmarSelecoes() {
-    if (!user?.id) {
+    const userId = user?.id ?? user?.uid;
+    if (!userId) {
       return Alert.alert('Sessão expirada', 'Faça login novamente.');
     }
 
     setLoading(true);
     try {
-      const { data, error } = await marcarRefeicao(user.id, dateISO, cafe, almoco, janta);
+      const { data, error } = await marcarRefeicao(userId, dateISO, cafe, almoco, janta);
       if (error) {
         console.error('Erro ao marcar refeição:', error);
         Alert.alert('Erro', 'Não foi possível registrar.');
@@ -99,7 +118,6 @@ export default function MenuScreen({ route, navigation }: Props) {
           activeColor="#174e0c"
         />
 
-        {/* Botão customizado */}
         <TouchableOpacity
           style={[styles.confirmButton, loading && { opacity: 0.7 }]}
           onPress={confirmarSelecoes}

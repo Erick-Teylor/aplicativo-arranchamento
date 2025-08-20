@@ -1,3 +1,4 @@
+// screens/LoginScreen.tsx
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -5,7 +6,7 @@ import { auth } from '../services/FirebaseConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme';
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation }: any) {
   const [id, setId] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,16 +20,32 @@ export default function LoginScreen({ navigation }) {
 
     try {
       console.log('📡 Tentando login no Firebase Auth...');
-      const userCredential = await signInWithEmailAndPassword(auth, `${id.trim()}@exemplo.com`, senha);
+      const emailFicticio = `${id.trim()}@exemplo.com`;
+      const userCredential = await signInWithEmailAndPassword(auth, emailFicticio, senha);
       const user = userCredential.user;
 
       console.log('✅ Login realizado com sucesso:', user.uid);
 
-      // Salvar usuário no AsyncStorage
-      await AsyncStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email }));
+      // salvar no AsyncStorage (uid + id_militar)
+      const userToStore: any = {
+        id: user.uid,
+        uid: user.uid,
+        email: user.email,
+        id_militar: id.trim(),
+      };
 
-      // Navegar para seleção de dia
-      navigation.navigate('SelectDay');
+      try {
+        await AsyncStorage.setItem('user', JSON.stringify(userToStore));
+        console.log('📥 AsyncStorage salvo:', userToStore);
+      } catch (storageErr) {
+        console.error('❌ Falha ao salvar AsyncStorage:', storageErr);
+      }
+
+      // navegar para SelectDay
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'SelectDay' as any }],
+      });
     } catch (error: any) {
       console.error('❌ Erro no login:', error);
       Alert.alert('Erro', 'ID Militar ou senha inválidos');
@@ -39,9 +56,8 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Imagem da logo */}
       <Image
-        source={require('../components/logo.png')} // Substitua pelo caminho da sua logo
+        source={require('../components/logo.png')}
         style={styles.logo}
         resizeMode="contain"
       />

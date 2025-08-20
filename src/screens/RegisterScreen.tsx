@@ -1,3 +1,4 @@
+// screens/RegisterScreen.tsx
 import React, { useState } from 'react';
 import { View, Text, TextInput, Alert, TouchableOpacity, Modal, FlatList, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -75,7 +76,7 @@ export default function RegisterScreen({ navigation }: Props) {
     }
 
     setLoading(true);
-    let userCredential = null;
+    let userCredential: any = null;
 
     try {
       const emailFicticio = `${id.trim()}@exemplo.com`;
@@ -162,7 +163,6 @@ export default function RegisterScreen({ navigation }: Props) {
           onChangeText={setConfirm}
         />
 
-        {/* Botão Criar Conta com mesma cor do LoginScreen */}
         <TouchableOpacity
           style={[styles.button, { backgroundColor: colors.button }]}
           onPress={criarConta}
