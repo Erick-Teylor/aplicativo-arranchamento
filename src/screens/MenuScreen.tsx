@@ -1,8 +1,8 @@
-// MenuScreen.tsx
+// src/screens/MenuScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation';
+import { RootStackParamList } from '../types';
 import { colors } from '../theme';
 import MealCard from '../components/MealCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,12 +19,10 @@ export default function MenuScreen({ route, navigation }: Props) {
   const [user, setUser] = useState<Usuario | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Ajusta título da tela
   useEffect(() => {
     navigation.setOptions({ title: label ? `Cardápio — ${label}` : 'Cardápio do Dia' });
   }, [label, navigation]);
 
-  // Carrega usuário e arranchamento do dia
   useEffect(() => {
     (async () => {
       try {
@@ -33,26 +31,29 @@ export default function MenuScreen({ route, navigation }: Props) {
           Alert.alert('Sessão expirada', 'Faça login novamente.');
           return navigation.navigate('Login');
         }
-
         const userData = JSON.parse(raw);
-        setUser(userData);
 
-        // Pega o ID correto: id ou uid
-        const userId = userData.id ?? userData.uid;
-        if (!userId) {
+        // Padroniza user sempre com uid
+        const userObj = { ...userData, uid: userData.uid || userData.id };
+        setUser(userObj);
+
+        if (!userObj.uid) {
           Alert.alert('Erro', 'ID de usuário inválido.');
           return navigation.navigate('Login');
         }
 
-        const { data, error } = await fetchArranchamento(userId, dateISO);
+        const ciaLabel = userObj.cia;
+        const { data, error } = await fetchArranchamento(userObj.uid, dateISO, ciaLabel);
         if (error) {
           console.error('Erro ao buscar arranchamento:', error);
-        } else if (data && data.length > 0) {
-          setCafe(!!data[0].cafe);
-          setAlmoco(!!data[0].almoco);
-          setJanta(!!data[0].janta);
+          // Se for erro de permissão do Firestore, mostre aviso específico
+          Alert.alert('Erro', 'Não foi possível buscar o arranchamento. Verifique suas permissões.');
+          setCafe(false); setAlmoco(false); setJanta(false);
+        } else if (data) {
+          setCafe(!!data.cafe);
+          setAlmoco(!!data.almoco);
+          setJanta(!!data.janta);
         } else {
-          // Nenhum arranchamento encontrado, reseta estados
           setCafe(false);
           setAlmoco(false);
           setJanta(false);
@@ -65,21 +66,21 @@ export default function MenuScreen({ route, navigation }: Props) {
     })();
   }, [dateISO, navigation]);
 
-  // Confirma seleção e envia para o Firebase
   async function confirmarSelecoes() {
-    const userId = user?.id ?? user?.uid;
-    if (!userId) {
+    if (!user?.uid) {
       return Alert.alert('Sessão expirada', 'Faça login novamente.');
     }
 
     setLoading(true);
     try {
-      const { data, error } = await marcarRefeicao(userId, dateISO, cafe, almoco, janta);
+      // sempre envia uid
+      const { data, error } = await marcarRefeicao(user.uid, dateISO, cafe, almoco, janta);
       if (error) {
         console.error('Erro ao marcar refeição:', error);
-        Alert.alert('Erro', 'Não foi possível registrar.');
+        Alert.alert('Erro', error.message || 'Não foi possível registrar.');
       } else {
-        Alert.alert('Tudo certo!', 'Arranchamento registrado com sucesso.');
+        const msg = data === 'removed' ? 'Arranchamento removido.' : 'Arranchamento registrado com sucesso.';
+        Alert.alert('Tudo certo!', msg);
         navigation.goBack();
       }
     } catch (e: any) {
@@ -99,7 +100,6 @@ export default function MenuScreen({ route, navigation }: Props) {
           value={cafe}
           onChange={setCafe}
           question="Vai tomar café?"
-          activeColor="#174e0c"
         />
         <MealCard
           title="Almoço"
@@ -107,7 +107,6 @@ export default function MenuScreen({ route, navigation }: Props) {
           value={almoco}
           onChange={setAlmoco}
           question="Vai almoçar?"
-          activeColor="#174e0c"
         />
         <MealCard
           title="Jantar"
@@ -115,7 +114,6 @@ export default function MenuScreen({ route, navigation }: Props) {
           value={janta}
           onChange={setJanta}
           question="Vai jantar?"
-          activeColor="#174e0c"
         />
 
         <TouchableOpacity

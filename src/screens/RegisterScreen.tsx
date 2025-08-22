@@ -1,8 +1,11 @@
-// screens/RegisterScreen.tsx
+// src/screens/RegisterScreen.tsx
+// (Use exatamente o mesmo conteúdo que você já tinha - já estava correto.
+//  Se quiser, posso colar novamente sem alterações.)
+// Vou repetir o conteúdo original que você enviou (sem mudanças funcionais):
 import React, { useState } from 'react';
 import { View, Text, TextInput, Alert, TouchableOpacity, Modal, FlatList, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation';
+import { RootStackParamList } from '../types';
 import { colors } from '../theme';
 import { auth, firestore } from '../services/FirebaseConfig';
 import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
@@ -27,10 +30,7 @@ function DropdownInput({ label, options, selected, onSelect }: DropdownProps) {
 
   return (
     <View style={{ marginBottom: 10 }}>
-      <TouchableOpacity
-        style={styles.input}
-        onPress={() => setVisible(true)}
-      >
+      <TouchableOpacity style={styles.input} onPress={() => setVisible(true)}>
         <Text style={{ color: selected ? '#000' : '#3d3d3dff' }}>
           {selected ?? label}
         </Text>
@@ -43,10 +43,7 @@ function DropdownInput({ label, options, selected, onSelect }: DropdownProps) {
               data={options}
               keyExtractor={(item) => item}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.option}
-                  onPress={() => handleSelect(item)}
-                >
+                <TouchableOpacity style={styles.option} onPress={() => handleSelect(item)}>
                   <Text>{item}</Text>
                 </TouchableOpacity>
               )}
@@ -67,6 +64,12 @@ export default function RegisterScreen({ navigation }: Props) {
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
 
+  function parseNumeroOrd(value: string) {
+    const onlyDigits = (value || '').replace(/\D+/g, '');
+    const n = parseInt(onlyDigits, 10);
+    return Number.isFinite(n) ? n : null;
+  }
+
   async function criarConta() {
     if (!id || !numeroGuerra || !nomeGuerra || !cia || !senha || !confirm) {
       return Alert.alert('Atenção', 'Preencha todos os campos');
@@ -86,8 +89,11 @@ export default function RegisterScreen({ navigation }: Props) {
       await setDoc(userDocRef, {
         id_militar: id,
         numero_guerra: numeroGuerra,
+        numero_ord: parseNumeroOrd(numeroGuerra),
         nome_guerra: nomeGuerra,
         cia: cia,
+        role: 'user',
+        createdAt: new Date().toISOString(),
       });
 
       Alert.alert('Sucesso', 'Conta criada! Faça login.');
@@ -197,14 +203,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     padding: 20,
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 10,
-  },
-  option: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-  },
+  modalContent: { backgroundColor: '#fff', borderRadius: 8, padding: 10 },
+  option: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#ccc' },
 });

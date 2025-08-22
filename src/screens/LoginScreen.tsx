@@ -1,10 +1,11 @@
-// screens/LoginScreen.tsx
+// src/screens/LoginScreen.tsx
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../services/FirebaseConfig';
+import { auth, firestore } from '../services/FirebaseConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function LoginScreen({ navigation }: any) {
   const [id, setId] = useState('');
@@ -19,36 +20,42 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
 
     try {
-      console.log('📡 Tentando login no Firebase Auth...');
       const emailFicticio = `${id.trim()}@exemplo.com`;
       const userCredential = await signInWithEmailAndPassword(auth, emailFicticio, senha);
       const user = userCredential.user;
 
-      console.log('✅ Login realizado com sucesso:', user.uid);
+      // Buscar dados do Firestore
+      const userDocRef = doc(firestore, 'usuarios', user.uid);
+      const userSnap = await getDoc(userDocRef);
 
-      // salvar no AsyncStorage (uid + id_militar)
-      const userToStore: any = {
-        id: user.uid,
-        uid: user.uid,
-        email: user.email,
-        id_militar: id.trim(),
-      };
-
-      try {
-        await AsyncStorage.setItem('user', JSON.stringify(userToStore));
-        console.log('📥 AsyncStorage salvo:', userToStore);
-      } catch (storageErr) {
-        console.error('❌ Falha ao salvar AsyncStorage:', storageErr);
+      if (!userSnap.exists()) {
+        throw new Error('Usuário não encontrado no banco de dados');
       }
 
-      // navegar para SelectDay
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'SelectDay' as any }],
-      });
+      const userData = userSnap.data();
+
+      // salvar no AsyncStorage (uid + dados básicos)
+      const userToStore: any = {
+        uid: user.uid,
+        email: user.email,
+        id_militar: userData.id_militar,
+        nome_guerra: userData.nome_guerra,
+        numero_guerra: userData.numero_guerra,
+        cia: userData.cia,
+        role: userData.role || 'user',
+      };
+
+      await AsyncStorage.setItem('user', JSON.stringify(userToStore));
+
+      // Navegação baseada no role
+      if (userData.role === 'admin') {
+        navigation.reset({ index: 0, routes: [{ name: 'Admin' as any }] });
+      } else {
+        navigation.reset({ index: 0, routes: [{ name: 'SelectDay' as any }] });
+      }
     } catch (error: any) {
-      console.error('❌ Erro no login:', error);
-      Alert.alert('Erro', 'ID Militar ou senha inválidos');
+      console.error('Erro no login:', error);
+      Alert.alert('Erro', error.message || 'ID Militar ou senha inválidos');
     } finally {
       setLoading(false);
     }
@@ -56,12 +63,7 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <Image
-        source={require('../components/logo.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
-
+      <Image source={require('../components/logo.png')} style={styles.logo} resizeMode="contain" />
       <Text style={styles.title}>Acesse sua conta</Text>
 
       <TextInput

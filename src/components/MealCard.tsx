@@ -1,5 +1,6 @@
+// src/components/MealCard.tsx
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors } from '../theme';
 
 type Props = {
@@ -8,6 +9,7 @@ type Props = {
   value: boolean;
   onChange: (v: boolean) => void;
   question: string;
+  activeColor?: string; // opcional, para compat
 };
 
 export default function MealCard({ title, subtitle, value, onChange, question }: Props) {
@@ -21,7 +23,6 @@ export default function MealCard({ title, subtitle, value, onChange, question }:
         <View style={styles.switchRow}>
           <Text style={styles.label}>Não</Text>
 
-          {/* Botão customizado */}
           <TouchableOpacity
             style={[styles.switchBase, value ? styles.switchOn : styles.switchOff]}
             activeOpacity={0.8}
@@ -59,7 +60,6 @@ const styles = StyleSheet.create({
   label: { color: colors.muted },
   question: { color: colors.text, marginRight: 10 },
 
-  // Estilos do toggle customizado
   switchBase: {
     width: 50,
     height: 28,
@@ -77,4 +77,3 @@ const styles = StyleSheet.create({
   knobOn: { backgroundColor: '#fff', alignSelf: 'flex-start' },
   knobOff: { backgroundColor: '#fff', alignSelf: 'flex-start' },
 });
-

@@ -1,14 +1,15 @@
+// src/screens/SelectDayScreen.tsx
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation';
+import { RootStackParamList } from '../types';
 import { addDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { colors } from '../theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchArranchamentosPeriodo } from '../services/api';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { fetchArranchamentosPeriodo } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SelectDay'>;
 
@@ -23,20 +24,29 @@ const next7Days = Array.from({ length: 7 }).map((_, i) => {
 });
 
 export default function SelectDayScreen({ navigation }: Props) {
-  const [user, setUser] = useState<{ id: string } | null>(null);
+  const [user, setUser] = useState<{ uid: string; role?: string; cia?: string } | null>(null);
   const [daysAnswered, setDaysAnswered] = useState<string[]>([]);
 
-  // Carregar os dias já arranchados de uma vez
-  const loadAnsweredDays = async (userId: string) => {
+  // Carregar os dias já arranchados do usuário logado
+  const loadAnsweredDays = async (userId: string, ciaLabel?: string) => {
+    if (!userId) {
+      console.warn('⚠ Nenhum userId fornecido, abortando busca de arranchamentos');
+      return;
+    }
+
     try {
       const dias = next7Days.map(item => item.iso);
-      const { data } = await fetchArranchamentosPeriodo(userId, dias);
-      if (data) {
-        const answered = data.map(item => item.data); // pega o campo 'data'
-        setDaysAnswered(answered);
+      const { data, error } = await fetchArranchamentosPeriodo(userId, dias, ciaLabel);
+      if (error) {
+        console.error('Erro ao buscar arranchamentos (periodo):', error);
+        setDaysAnswered([]);
+        return;
       }
+      const answered = (data || []).map((d: any) => d.data).filter(Boolean);
+      setDaysAnswered(answered);
     } catch (e) {
-      console.error('Erro ao buscar arranchamentos:', e);
+      console.error('❌ Erro ao buscar arranchamentos:', e);
+      setDaysAnswered([]);
     }
   };
 
@@ -46,17 +56,22 @@ export default function SelectDayScreen({ navigation }: Props) {
       const raw = await AsyncStorage.getItem('user');
       if (!raw) return;
       const loggedUser = JSON.parse(raw);
-      setUser(loggedUser);
 
-      await loadAnsweredDays(loggedUser.id);
+      const uid = loggedUser.uid || loggedUser.id;
+      const userObj = { uid, role: loggedUser.role, cia: loggedUser.cia };
+      setUser(userObj);
+
+      if (uid) {
+        await loadAnsweredDays(uid, userObj.cia);
+      }
     })();
   }, []);
 
   // Atualiza os ícones sempre que a tela recebe foco
   useFocusEffect(
     React.useCallback(() => {
-      if (!user) return;
-      loadAnsweredDays(user.id);
+      if (!user?.uid) return;
+      loadAnsweredDays(user.uid, user.cia);
     }, [user])
   );
 
@@ -79,7 +94,9 @@ export default function SelectDayScreen({ navigation }: Props) {
         <Text style={styles.itemText}>{item.label}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {item.isToday && <Text style={styles.tag}>Hoje</Text>}
-          {isAnswered && <MaterialIcons name="check-circle" size={24} color="#276624" style={{ marginLeft: 8 }} />}
+          {isAnswered && (
+            <MaterialIcons name="check-circle" size={24} color="#276624" style={{ marginLeft: 8 }} />
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -120,4 +137,4 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 8,
   },
-});   
+});
