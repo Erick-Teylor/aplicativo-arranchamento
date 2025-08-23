@@ -96,21 +96,21 @@ export default function MenuScreen({ route, navigation }: Props) {
       <View style={styles.card}>
         <MealCard
           title="Café da Manhã"
-          subtitle="Pão, café, leite, frutas, queijo, presunto"
+      //    subtitle="Pão, café, leite, frutas, queijo, presunto"
           value={cafe}
           onChange={setCafe}
           question="Vai tomar café?"
         />
         <MealCard
           title="Almoço"
-          subtitle="Arroz, feijão, carne, salada, sobremesa"
+      //    subtitle="Arroz, feijão, carne, salada, sobremesa"
           value={almoco}
           onChange={setAlmoco}
           question="Vai almoçar?"
         />
         <MealCard
           title="Jantar"
-          subtitle="Sopa, pão, carne, legumes, fruta"
+      //    subtitle="Sopa, pão, carne, legumes, fruta"
           value={janta}
           onChange={setJanta}
           question="Vai jantar?"

@@ -1,4 +1,3 @@
-// src/screens/LoginScreen.tsx
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -69,6 +68,7 @@ export default function LoginScreen({ navigation }: any) {
       <TextInput
         style={styles.input}
         placeholder="Digite sua ID militar"
+        placeholderTextColor="#888"
         keyboardType="numeric"
         value={id}
         onChangeText={setId}
@@ -76,6 +76,7 @@ export default function LoginScreen({ navigation }: any) {
       <TextInput
         style={styles.input}
         placeholder="Digite sua senha"
+        placeholderTextColor="#888"
         secureTextEntry
         value={senha}
         onChangeText={setSenha}
@@ -96,7 +97,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#fff' },
   logo: { width: 250, height: 250, alignSelf: 'center', marginBottom: 5, marginTop: -40 },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 5, marginBottom: 10 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+    color: '#000', // texto e *** da senha ficam visíveis
+    fontSize: 16,
+  },
   button: { backgroundColor: colors.button, padding: 12, borderRadius: 5 },
   buttonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
   link: { color: 'blue', textAlign: 'center', marginTop: 10 },

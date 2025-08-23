@@ -9,21 +9,20 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc, writeBatch } from "firebase/firestore";
 import { firestore } from "../services/FirebaseConfig";
-import { format, addDays, parse } from "date-fns";
+import { format, addDays } from "date-fns";
 
 /** ---------- Tipos ---------- */
 type Arranchamento = {
   id: string;
   nome: string;
-  numero_guerra?: string | number; // pode vir string ou number
+  numero_guerra?: string | number;
   numero_ord?: number;
   cafe: boolean;
   almoco: boolean;
   janta: boolean;
   presente?: boolean;
-  // alguns docs podem ter "numero guerra" (com espaço); acessamos via (item as any)["numero guerra"]
 };
 
 type Option = { label: string; value: string };
@@ -35,12 +34,10 @@ type DropdownProps = {
   onSelect: (value: string) => void;
 };
 
-/** ---------- Dropdown genérico (estilo botão) ---------- */
+/** ---------- Dropdown genérico ---------- */
 function DropdownInput({ label, options, selected, onSelect }: DropdownProps) {
   const [visible, setVisible] = useState(false);
-
-  const selectedLabel =
-    options.find((o) => o.value === selected)?.label ?? label;
+  const selectedLabel = options.find((o) => o.value === selected)?.label ?? label;
 
   const handleSelect = (value: string) => {
     onSelect(value);
@@ -49,29 +46,17 @@ function DropdownInput({ label, options, selected, onSelect }: DropdownProps) {
 
   return (
     <View style={{ flex: 1 }}>
-      <TouchableOpacity
-        style={styles.inputButton}
-        onPress={() => setVisible(true)}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={styles.inputButton} onPress={() => setVisible(true)} activeOpacity={0.8}>
         <Text style={styles.inputButtonText} numberOfLines={1}>
           {selectedLabel}
         </Text>
       </TouchableOpacity>
 
       <Modal transparent visible={visible} animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          onPress={() => setVisible(false)}
-          activeOpacity={1}
-        >
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setVisible(false)} activeOpacity={1}>
           <View style={styles.modalContent}>
             {options.map((item) => (
-              <TouchableOpacity
-                key={item.value}
-                style={styles.option}
-                onPress={() => handleSelect(item.value)}
-              >
+              <TouchableOpacity key={item.value} style={styles.option} onPress={() => handleSelect(item.value)}>
                 <Text>{item.label}</Text>
               </TouchableOpacity>
             ))}
@@ -82,14 +67,8 @@ function DropdownInput({ label, options, selected, onSelect }: DropdownProps) {
   );
 }
 
-/** ---------- Checkbox custom (sem libs) ---------- */
-function CheckBox({
-  checked,
-  onPress,
-}: {
-  checked: boolean;
-  onPress: () => void;
-}) {
+/** ---------- Checkbox ---------- */
+function CheckBox({ checked, onPress }: { checked: boolean; onPress: () => void }) {
   return (
     <TouchableOpacity style={styles.checkbox} onPress={onPress}>
       {checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
@@ -111,21 +90,18 @@ function todayYMD(): string {
 
 /** ---------- Tela ---------- */
 export default function AdminScreen() {
-  // Filtros
   const [companhia, setCompanhia] = useState<string | null>("CEP");
   const [refeicao, setRefeicao] = useState<string | null>("cafe");
   const [dataSelecionada, setDataSelecionada] = useState<string>(todayYMD());
 
-  // Lista
   const [arranchamentos, setArranchamentos] = useState<Arranchamento[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Opções
   const companhiasOptions: Option[] = useMemo(
     () => [
       { label: "CEP", value: "CEP" },
       { label: "CCAP", value: "CCAP" },
-      { label: "2° Cia", value: "2cia_label" }, // value interno; mapeamos para id
+      { label: "2° Cia", value: "2cia_label" },
       { label: "3° Cia", value: "3cia_label" },
     ],
     []
@@ -137,20 +113,15 @@ export default function AdminScreen() {
     { label: "Janta", value: "janta" },
   ];
 
-  // Próximos 7 dias: label curto "dd/MM/yy", value "yyyy-MM-dd"
   const diasOptions: Option[] = useMemo(
     () =>
       Array.from({ length: 7 }).map((_, i) => {
         const d = addDays(new Date(), i);
-        return {
-          value: format(d, "yyyy-MM-dd"),
-          label: format(d, "dd/MM/yy"),
-        };
+        return { value: format(d, "yyyy-MM-dd"), label: format(d, "dd/MM/yy") };
       }),
     []
   );
 
-  // Mapa cia -> id usado no Firestore
   const ciaID = useMemo(() => {
     switch (companhia) {
       case "CEP":
@@ -166,13 +137,11 @@ export default function AdminScreen() {
     }
   }, [companhia]);
 
-  /** ---------- Buscar arranchados (apenas da refeição selecionada) ---------- */
+  /** ---------- Buscar arranchados ---------- */
   const buscarArranchamentos = async () => {
     if (!companhia || !refeicao || !dataSelecionada) return;
-
     setLoading(true);
     try {
-      // Caminho: arranchamentos/{data}/cias/{ciaID}/selecoes
       const selecoesRef = collection(
         firestore,
         `arranchamentos/${dataSelecionada}/cias/${ciaID}/selecoes`
@@ -182,7 +151,6 @@ export default function AdminScreen() {
       const lista: Arranchamento[] = [];
       snap.forEach((docSnap) => {
         const d = docSnap.data() as any;
-        // Apenas quem marcou a refeição atual
         if (d[refeicao as "cafe" | "almoco" | "janta"]) {
           lista.push({
             id: docSnap.id,
@@ -197,12 +165,9 @@ export default function AdminScreen() {
         }
       });
 
-      // Ordenar por número de guerra (robusto para string/number e chaves diferentes)
       lista.sort((a, b) => {
-        const ag =
-          numeroGuerraToInt(a.numero_guerra ?? (a as any)["numero guerra"]);
-        const bg =
-          numeroGuerraToInt(b.numero_guerra ?? (b as any)["numero guerra"]);
+        const ag = numeroGuerraToInt(a.numero_guerra ?? (a as any)["numero guerra"]);
+        const bg = numeroGuerraToInt(b.numero_guerra ?? (b as any)["numero guerra"]);
         return ag - bg;
       });
 
@@ -216,10 +181,9 @@ export default function AdminScreen() {
 
   useEffect(() => {
     buscarArranchamentos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companhia, refeicao, dataSelecionada]);
 
-  /** ---------- Toggle presença (salva no Firestore) ---------- */
+  /** ---------- Toggle presença ---------- */
   const togglePresenca = async (item: Arranchamento) => {
     try {
       const ref = doc(
@@ -235,10 +199,49 @@ export default function AdminScreen() {
     }
   };
 
+  /** ---------- Marcar/desmarcar todos ---------- */
+  const marcarTodos = async () => {
+    try {
+      const batch = writeBatch(firestore);
+      arranchamentos.forEach((item) => {
+        const ref = doc(
+          firestore,
+          `arranchamentos/${dataSelecionada}/cias/${ciaID}/selecoes/${item.id}`
+        );
+        batch.update(ref, { presente: true });
+      });
+      await batch.commit();
+      setArranchamentos((prev) => prev.map((i) => ({ ...i, presente: true })));
+    } catch (e) {
+      console.error("Erro ao marcar todos:", e);
+    }
+  };
+
+  const desmarcarTodos = async () => {
+    try {
+      const batch = writeBatch(firestore);
+      arranchamentos.forEach((item) => {
+        const ref = doc(
+          firestore,
+          `arranchamentos/${dataSelecionada}/cias/${ciaID}/selecoes/${item.id}`
+        );
+        batch.update(ref, { presente: false });
+      });
+      await batch.commit();
+      setArranchamentos((prev) => prev.map((i) => ({ ...i, presente: false })));
+    } catch (e) {
+      console.error("Erro ao desmarcar todos:", e);
+    }
+  };
+
+  /** ---------- Confirmar ---------- */
+  const confirmar = () => {
+    console.log("Confirmado!");
+  };
+
   /** ---------- Render ---------- */
   const renderItem = ({ item }: { item: Arranchamento }) => {
-    const numero =
-      item.numero_guerra ?? (item as any)["numero guerra"] ?? "";
+    const numero = item.numero_guerra ?? (item as any)["numero guerra"] ?? "";
     return (
       <View style={styles.item}>
         <Text style={styles.nome}>
@@ -249,30 +252,28 @@ export default function AdminScreen() {
     );
   };
 
+  const totalArranchados = arranchamentos.length;
+  const totalPresentes = arranchamentos.filter((a) => a.presente).length;
+
   return (
     <View style={styles.container}>
       <Text style={styles.titulo}>Admin - Arranchamento</Text>
 
-      {/* Linha de filtros: todos os "botões" com o MESMO tamanho e texto centralizado */}
+      {/* Filtros */}
       <View style={styles.filtros}>
-        <DropdownInput
-          label="Companhia"
-          options={companhiasOptions}
-          selected={companhia}
-          onSelect={setCompanhia}
-        />
-        <DropdownInput
-          label="Refeição"
-          options={refeicoesOptions}
-          selected={refeicao}
-          onSelect={setRefeicao}
-        />
-        <DropdownInput
-          label="Data"
-          options={diasOptions}
-          selected={dataSelecionada}
-          onSelect={setDataSelecionada}
-        />
+        <DropdownInput label="Companhia" options={companhiasOptions} selected={companhia} onSelect={setCompanhia} />
+        <DropdownInput label="Refeição" options={refeicoesOptions} selected={refeicao} onSelect={setRefeicao} />
+        <DropdownInput label="Data" options={diasOptions} selected={dataSelecionada} onSelect={setDataSelecionada} />
+      </View>
+
+      {/* Ações globais */}
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.actionButton} onPress={marcarTodos}>
+          <Text style={styles.actionButtonText}>Marcar todos</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={desmarcarTodos}>
+          <Text style={styles.actionButtonText}>Desmarcar todos</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Lista */}
@@ -283,13 +284,21 @@ export default function AdminScreen() {
           data={arranchamentos}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          ListEmptyComponent={
-            <Text style={styles.empty}>
-              Selecione companhia, refeição e uma data.
-            </Text>
+          ListEmptyComponent={<Text style={styles.empty}>Selecione companhia, refeição e uma data.</Text>}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          ListFooterComponent={
+            <TouchableOpacity style={styles.confirmButton} onPress={confirmar}>
+              <Text style={styles.confirmButtonText}>Confirmar</Text>
+            </TouchableOpacity>
           }
         />
       )}
+
+      {/* Rodapé fixo */}
+      <View style={styles.footer}>
+        <Text>Total arranchados: {totalArranchados}</Text>
+        <Text>Presentes: {totalPresentes}</Text>
+      </View>
     </View>
   );
 }
@@ -301,7 +310,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
   titulo: { fontSize: 22, fontWeight: "bold", marginBottom: 12, textAlign: "center" },
 
-  // Linha dos filtros: 3 colunas de mesmo tamanho
   filtros: {
     flexDirection: "row",
     alignItems: "center",
@@ -309,7 +317,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  // Botão do dropdown com tamanho uniforme e texto centralizado
   inputButton: {
     height: BUTTON_HEIGHT,
     borderWidth: 1,
@@ -320,19 +327,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 10,
   },
-  inputButtonText: {
-    fontSize: 15,
-    textAlign: "center",
-  },
+  inputButtonText: { fontSize: 15, textAlign: "center" },
 
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.3)",
-    padding: 20,
-  },
+  modalOverlay: { flex: 1, justifyContent: "center", backgroundColor: "rgba(0,0,0,0.3)", padding: 20 },
   modalContent: { backgroundColor: "#fff", borderRadius: 8, padding: 10 },
   option: { padding: 12, borderBottomWidth: 1, borderBottomColor: "#eee" },
+
+  actionRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  actionButton: {
+    flex: 1,
+    marginHorizontal: 4,
+    paddingVertical: 10,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  actionButtonText: { fontSize: 15, fontWeight: "500" },
 
   item: {
     flexDirection: "row",
@@ -345,7 +355,6 @@ const styles = StyleSheet.create({
   nome: { fontWeight: "bold", fontSize: 16 },
   empty: { textAlign: "center", marginTop: 16, color: "#666" },
 
-  // checkbox
   checkbox: {
     width: 26,
     height: 26,
@@ -355,10 +364,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  checkboxMark: {
-    fontSize: 18,
-    lineHeight: 18,
-    color: "#0c5708ff",
-    fontWeight: "900",
+  checkboxMark: { fontSize: 18, lineHeight: 18, color: "#0c5708ff", fontWeight: "900" },
+
+  confirmButton: {
+    backgroundColor: "#0c5708ff",
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginTop: 16,
+    marginHorizontal: 4,
+  },
+  confirmButtonText: { color: "#fff", fontSize: 18, fontWeight: "bold", textAlign: "center" },
+
+  footer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#ddd",
+    marginTop: 4,
   },
 });
